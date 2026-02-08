@@ -53,7 +53,6 @@ const Login = () => {
 
   // --- GOOGLE LOGIN LOGIC ---
   const handleGoogleLogin = () => {
-    // ✅ FIX: Points to Backend Port 5000
     window.location.href = 'http://localhost:5000/api/auth/google';
   };
 
@@ -71,7 +70,6 @@ const Login = () => {
     setStatus('loading');
 
     try {
-      // 1. Send data to Real Backend (Port 5000)
       const response = await fetch('http://localhost:5000/api/auth/login', {
         method: 'POST',
         headers: {
@@ -86,7 +84,6 @@ const Login = () => {
         throw new Error(data.message || "Login failed");
       }
 
-      // 2. Login Successful: Save Token & User to Browser Storage
       setStatus('success');
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify({
@@ -94,12 +91,10 @@ const Login = () => {
         lastName: data.lastName,
         email: data.email,
         role: data.role,
-        isOnboarded: data.isOnboarded // Save onboarding status
+        isOnboarded: data.isOnboarded 
       }));
 
-      // 3. Redirect Logic
       setTimeout(() => {
-        // ✅ LOGIC: If user has profile data, go to Dashboard. If not, go to Onboarding Step 1.
         if (data.isOnboarded) {
             navigate('/dashboard'); 
         } else {
@@ -110,18 +105,18 @@ const Login = () => {
     } catch (err) {
       console.error("Login Error:", err);
       setStatus('error');
-      // Friendly error message if server is down
       setErrorMessage(err.message === "Failed to fetch" ? "Cannot connect to server. Is Backend running on Port 5000?" : err.message);
     }
   };
 
   return (
-    <div className="font-display bg-[#06457F] text-white min-h-screen w-full flex flex-col lg:flex-row relative overflow-hidden selection:bg-[#0474C4] selection:text-white">
+    <div className="font-display bg-[#06457F] text-white h-screen w-full flex flex-col lg:flex-row relative overflow-hidden selection:bg-[#0474C4] selection:text-white">
       
       <LoginStyles />
 
       {/* ================= LEFT PANEL (CONTENT) ================= */}
-      <div className="w-full lg:w-1/2 flex flex-col relative z-20 bg-[#06457F] border-r border-[#043360] min-h-screen shrink-0">
+      {/* ✅ FIXED: Removed 'overflow-y-auto' and replaced with 'overflow-hidden' to remove scroll part. */}
+      <div className="w-full lg:w-1/2 flex flex-col relative z-20 bg-[#06457F] border-r border-[#043360] h-full overflow-hidden shrink-0">
         
         {/* LOGO */}
         <div className="absolute top-8 left-8 sm:left-12 z-50 select-none">
@@ -240,7 +235,8 @@ const Login = () => {
               </p>
             </div>
 
-            <div className="text-center mt-6">
+            {/* ✅ FIXED: Changed 'mt-6' to 'mt-2' to move text one step above */}
+            <div className="text-center mt-2">
                <p className="text-blue-300/50 text-[10px] font-medium tracking-wide">© 2026 Career Orbit. All rights reserved.</p>
             </div>
 
@@ -249,11 +245,12 @@ const Login = () => {
       </div>
 
       {/* ================= RIGHT PANEL (ANIMATION) ================= */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#A8C4EC] relative items-center justify-center overflow-hidden h-screen sticky top-0 shrink-0">
+      <div className="hidden lg:flex lg:w-1/2 bg-[#A8C4EC] relative items-center justify-center overflow-hidden h-full sticky top-0 shrink-0">
         
-        <div className="relative w-full h-full max-w-[800px] max-h-[800px] flex items-center justify-center z-10 scale-[0.75] -translate-y-12 transition-transform duration-500">
+        <div className="relative w-[500px] h-[500px] shrink-0 flex items-center justify-center z-10 -translate-y-12">
+            
             {/* Orbit 1 */}
-            <div className="absolute w-[40%] h-[40%] aspect-square rounded-full border-[2px] border-cyan-900/90 border-dashed animate-spin-slow shadow-[0_0_20px_rgba(6,182,212,0.15)]" style={{animationDuration: '60s'}}>
+            <div className="absolute w-[40%] h-[40%] rounded-full border-[2px] border-cyan-900/90 border-dashed animate-spin-slow shadow-[0_0_20px_rgba(6,182,212,0.15)]" style={{animationDuration: '60s'}}>
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2" style={{ animation: 'spin 60s linear infinite reverse' }}>
                     <div className="float-icon-enhanced w-12 h-12 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.4)] bg-[#0f172a]">
                         <span className="material-symbols-outlined text-cyan-300 text-[20px]">terminal</span>
@@ -262,7 +259,7 @@ const Login = () => {
             </div>
             
             {/* Orbit 2 */}
-            <div className="absolute w-[60%] h-[60%] aspect-square rounded-full border-[1.5px] border-purple-950/90 animate-spin-reverse-slow" style={{animationDuration: '80s'}}>
+            <div className="absolute w-[60%] h-[60%] rounded-full border-[1.5px] border-purple-950/90 animate-spin-reverse-slow" style={{animationDuration: '80s'}}>
                  <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2" style={{ animation: 'spin 80s linear infinite' }}>
                     <div className="float-icon-enhanced w-12 h-12 border-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.4)] bg-[#0f172a]">
                         <span className="material-symbols-outlined text-emerald-400 text-[20px]">group</span>
@@ -271,7 +268,7 @@ const Login = () => {
             </div>
 
             {/* Orbit 3 */}
-            <div className="absolute w-[75%] h-[75%] aspect-square rounded-full border-[2px] border-fuchsia-950/90 border-dashed animate-spin-slow shadow-[0_0_35px_rgba(217,70,239,0.15)]" style={{animationDuration: '100s'}}>
+            <div className="absolute w-[75%] h-[75%] rounded-full border-[2px] border-fuchsia-950/90 border-dashed animate-spin-slow shadow-[0_0_35px_rgba(217,70,239,0.15)]" style={{animationDuration: '100s'}}>
                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2" style={{ animation: 'spin 100s linear infinite reverse' }}>
                     <div className="float-icon-enhanced w-11 h-11 border-purple-400 shadow-[0_0_15px_rgba(192,132,252,0.4)] bg-[#0f172a]">
                         <span className="material-symbols-outlined text-purple-400 text-[20px]">emoji_events</span>
@@ -280,7 +277,7 @@ const Login = () => {
             </div>
 
             {/* Orbit 4 */}
-            <div className="absolute w-[95%] h-[95%] aspect-square rounded-full border-[1.5px] border-indigo-950/90 animate-spin-reverse-slow" style={{animationDuration: '120s'}}>
+            <div className="absolute w-[95%] h-[95%] rounded-full border-[1.5px] border-indigo-950/90 animate-spin-reverse-slow" style={{animationDuration: '120s'}}>
                 <div className="absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2" style={{ animation: 'spin 120s linear infinite' }}>
                     <div className="float-icon-enhanced w-12 h-12 border-pink-400 shadow-[0_0_15px_rgba(244,114,182,0.4)] bg-[#0f172a]">
                         <span className="material-symbols-outlined text-pink-400 text-[22px]">article</span>
@@ -297,8 +294,7 @@ const Login = () => {
             </div>
         </div>
 
-        {/* Text Container */}
-        <div className="absolute bottom-5 right-10 lg:right-16 z-50 text-right pointer-events-none max-w-[80%]">
+        <div className="absolute bottom-5 right-5 lg:right-6 z-50 text-right pointer-events-none max-w-[80%]">
             <h2 className="font-display font-semibold text-2xl lg:text-3xl xl:text-4xl leading-relaxed tracking-wide drop-shadow-sm">
                 <span className="block text-[#06457F]">Build skills,</span>
                 <span className="block text-[#00E676] font-bold drop-shadow-sm">Apply for opportunities,</span>
