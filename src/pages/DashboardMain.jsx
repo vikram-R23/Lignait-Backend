@@ -1,25 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-// ====================================================================
-// SESSION CACHE VARIABLE
-// ====================================================================
 let sessionRoadmapStatus = false; 
 
 const DashboardMain = () => {
   const navigate = useNavigate();
   const location = useLocation(); 
 
-  // --------------------------------
-  // DASHBOARD STATE
-  // --------------------------------
   const [isRoadmapReady, setIsRoadmapReady] = useState(sessionRoadmapStatus);
   const [showRoadmapModal, setShowRoadmapModal] = useState(false);
-  
-  // Store Real Roadmap Data
   const [roadmapData, setRoadmapData] = useState(null);
 
-  // User Profile State (Fixes "Hi undefined")
   const [userProfile, setUserProfile] = useState({
     firstName: 'Guest',
     lastName: '',
@@ -27,23 +18,11 @@ const DashboardMain = () => {
     skills: []
   });
 
-  const [currentPhase, setCurrentPhase] = useState(
-    isRoadmapReady ? "Phase 1: Foundations" : "Career Roadmap"
-  );
-  const [phaseProgress, setPhaseProgress] = useState(
-    isRoadmapReady ? 15 : 0
-  );
-  const [aiInsight, setAiInsight] = useState(
-    isRoadmapReady 
-      ? "Roadmap active! Focus on mastering the basics this week." 
-      : "Welcome to Career Orbit! Let's generate your personalized roadmap to get started."
-  );
-  
+  const [currentPhase, setCurrentPhase] = useState(isRoadmapReady ? "Phase 1: Foundations" : "Career Roadmap");
+  const [phaseProgress, setPhaseProgress] = useState(isRoadmapReady ? 15 : 0);
+  const [aiInsight, setAiInsight] = useState(isRoadmapReady ? "Roadmap active! Focus on mastering the basics this week." : "Welcome to Career Orbit! Let's generate your personalized roadmap to get started.");
   const [showToast, setShowToast] = useState(false);
 
-  // --------------------------------
-  // CHATBOT STATE
-  // --------------------------------
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [chatInput, setChatInput] = useState("");
@@ -51,14 +30,12 @@ const DashboardMain = () => {
   const [chatMessages, setChatMessages] = useState([]); 
   const chatEndRef = useRef(null);
 
-  // Auto-scroll Chat
   useEffect(() => {
     if (isChatOpen && chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [chatMessages, isChatOpen, isExpanded, isTyping]);
 
-  // Check if Roadmap was passed from Onboarding
   useEffect(() => {
     if (location.state?.roadmap) {
         setRoadmapData(location.state.roadmap);
@@ -69,29 +46,19 @@ const DashboardMain = () => {
     }
   }, [location.state]);
 
-  // ✅ FETCH USER PROFILE ON MOUNT (Fixes Personalization)
   useEffect(() => {
     const fetchUserProfile = async () => {
         const token = localStorage.getItem('token');
         const localUser = JSON.parse(localStorage.getItem('user'));
-
-        // 1. Set basic info from local storage first (for speed)
         if (localUser) {
-            setUserProfile(prev => ({ 
-                ...prev, 
-                firstName: localUser.firstName || "Guest", 
-                lastName: localUser.lastName 
-            }));
+            setUserProfile(prev => ({ ...prev, firstName: localUser.firstName || "Guest", lastName: localUser.lastName }));
         }
-
         if (!token) return;
 
-        // 2. Fetch full details (Goal, Skills) from Database
         try {
             const response = await fetch('http://localhost:5000/api/profile', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            
             if (response.ok) {
                 const data = await response.json();
                 setUserProfile({
@@ -100,88 +67,14 @@ const DashboardMain = () => {
                     careerGoal: data.careerGoal || '',
                     skills: data.skills || []
                 });
-                
-                // Initialize chat message with REAL name
-                setChatMessages([
-                    { id: 1, sender: 'ai', text: isRoadmapReady 
-                        ? 'Welcome back! Your roadmap is active. How can I help?' 
-                        : `Hi ${data.firstName || 'there'}! I am your AI Career Assistant. Tell me your career goal (e.g., "Full Stack Developer") to generate a roadmap.` 
-                    }
-                ]);
+                setChatMessages([{ id: 1, sender: 'ai', text: isRoadmapReady ? 'Welcome back! Your roadmap is active. How can I help?' : `Hi ${data.firstName || 'there'}! I am your AI Career Assistant. Tell me your career goal to generate a roadmap or ask me anything!` }]);
             }
         } catch (error) {
-            console.error("Error fetching profile:", error);
-            setChatMessages([
-                { id: 1, sender: 'ai', text: `Hi there! I am your AI Career Assistant. Tell me your career goal to generate a roadmap.` }
-            ]);
+            setChatMessages([{ id: 1, sender: 'ai', text: `Hi there! I am your AI Career Assistant. Tell me your career goal or ask me anything!` }]);
         }
     };
-
     fetchUserProfile();
   }, [isRoadmapReady]);
-
-
-  // --- REAL LLM LOGIC (Connected to Backend) ---
-  const mockLlmResponse = async (userText) => {
-    const delay = Math.floor(Math.random() * 500) + 1000;
-    await new Promise(resolve => setTimeout(resolve, delay));
-
-    const lowerInput = userText.toLowerCase();
-
-    // Check if this is a request to generate a roadmap
-    const isGenerationRequest = lowerInput.includes('generate') || lowerInput.includes('roadmap') || (!isRoadmapReady && userText.length > 3);
-
-    if (!isRoadmapReady && isGenerationRequest) {
-      try {
-          const token = localStorage.getItem('token');
-          if (!token) return "Please log in to generate a roadmap.";
-
-          // ✅ Use Profile Goal if available, otherwise use what user typed
-          const effectiveGoal = userProfile.careerGoal ? userProfile.careerGoal : userText;
-
-          // Call AI Endpoint
-          const aiRes = await fetch('http://localhost:5000/api/ai/roadmap', {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                goal: effectiveGoal,
-                currentRole: "Student", 
-                skills: userProfile.skills
-            })
-          });
-
-          const aiResult = await aiRes.json();
-
-          if (!aiResult.success) throw new Error("AI Failed");
-
-          // Update State with Real Data
-          sessionRoadmapStatus = true; 
-          setIsRoadmapReady(true);     
-          setRoadmapData(aiResult.data);
-          
-          setCurrentPhase(aiResult.data.steps?.[0]?.phase || "Phase 1: Foundation");
-          setPhaseProgress(0);
-          setAiInsight(`Roadmap generated for ${effectiveGoal}!`);
-          
-          setTimeout(() => setShowRoadmapModal(true), 1500);
-
-          return `I've successfully generated your ${effectiveGoal} roadmap! Opening it now...`;
-
-      } catch (error) {
-          console.error("AI Generation Error:", error);
-          return "I encountered an error connecting to the server. Please ensure the backend is running on Port 5000.";
-      }
-    }
-
-    // Standard Responses
-    if (lowerInput.includes('resume')) return "Opening the AI Resume Builder...";
-    if (lowerInput.includes('mentor')) return "Redirecting you to our mentorship network...";
-    
-    return "I'm here to help. Type your career goal (e.g., 'Full Stack Developer') to generate a roadmap.";
-  };
 
   const handleChatSubmit = async (e, overrideText = null) => {
     if (e) e.preventDefault();
@@ -195,21 +88,54 @@ const DashboardMain = () => {
 
     const lowerText = textToSend.toLowerCase();
     
-    // Navigation Keywords
-    if(overrideText === 'Resume Builder' || lowerText.includes('resume')) { setTimeout(() => { navigate('/resume'); setIsTyping(false); }, 1500); }
-    else if(overrideText === 'Find a Mentor' || lowerText.includes('mentor')) { setTimeout(() => { navigate('/mentors'); setIsTyping(false); }, 1500); }
-    else if(overrideText === 'Mock Interview' || lowerText.includes('interview')) { setTimeout(() => { navigate('/mock-interview'); setIsTyping(false); }, 1500); }
-    else if(overrideText === 'LMS Courses' || lowerText.includes('course')) { setTimeout(() => { navigate('/lms-courses'); setIsTyping(false); }, 1500); }
-    else if(overrideText === 'Practice Ground' || lowerText.includes('practice')) { setTimeout(() => { navigate('/practice-ground'); setIsTyping(false); }, 1500); }
+    if(overrideText === 'Resume Builder' || lowerText.includes('resume')) { setTimeout(() => { navigate('/resume'); setIsTyping(false); }, 1500); return; }
+    else if(overrideText === 'Find a Mentor' || lowerText.includes('mentor')) { setTimeout(() => { navigate('/mentors'); setIsTyping(false); }, 1500); return; }
+    else if(overrideText === 'Mock Interview' || lowerText.includes('interview')) { setTimeout(() => { navigate('/mock-interview'); setIsTyping(false); }, 1500); return; }
+    else if(overrideText === 'LMS Courses' || lowerText.includes('course')) { setTimeout(() => { navigate('/lms-courses'); setIsTyping(false); }, 1500); return; }
+    else if(overrideText === 'Practice Ground' || lowerText.includes('practice')) { setTimeout(() => { navigate('/practice-ground'); setIsTyping(false); }, 1500); return; }
     else if(overrideText === 'View Roadmap' && isRoadmapReady) { setShowRoadmapModal(true); setIsTyping(false); return; }
 
     try {
-        const aiResponseText = await mockLlmResponse(textToSend);
-        const newAiMsg = { id: Date.now() + 1, sender: 'ai', text: aiResponseText };
-        setChatMessages(prev => [...prev, newAiMsg]);
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error("Please log in to use AI.");
+
+        const isGenerationRequest = lowerText.includes('generate') || lowerText.includes('roadmap');
+
+        if (isGenerationRequest) {
+            const effectiveGoal = userProfile.careerGoal ? userProfile.careerGoal : textToSend;
+            const response = await fetch('http://localhost:5000/api/ai/roadmap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ goal: effectiveGoal, currentRole: "Student", skills: userProfile.skills })
+            });
+
+            const data = await response.json();
+            if (!data.success) throw new Error(data.message || "Generation Failed");
+
+            sessionRoadmapStatus = true; 
+            setIsRoadmapReady(true);     
+            setRoadmapData(data.data);
+            setCurrentPhase(data.data.steps?.[0]?.phase || "Phase 1: Foundation");
+            setPhaseProgress(0);
+            setAiInsight(`Roadmap generated for ${effectiveGoal}!`);
+            
+            setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: `I've generated your ${effectiveGoal} roadmap! Opening it now...` }]);
+            setTimeout(() => setShowRoadmapModal(true), 1500);
+
+        } else {
+            // STANDARD PERSONALIZED CHATBOT RESPONSE
+            const response = await fetch('http://localhost:5000/api/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ message: textToSend, context: 'career_mentor' })
+            });
+
+            const data = await response.json();
+            setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: data.reply || "I couldn't process that response." }]);
+        }
+
     } catch (error) {
-        console.error("Chat Error", error);
-        setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: "Sorry, I couldn't connect to the AI server." }]);
+        setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: "⚠️ Server not reachable. Ensure backend is running." }]);
     } finally {
         setIsTyping(false); 
     }
@@ -227,7 +153,6 @@ const DashboardMain = () => {
   const handleGenerateClick = () => {
     setIsChatOpen(true);
     setIsExpanded(true); 
-    // Automatically trigger if the user has a goal in their profile
     if (!isRoadmapReady && userProfile.careerGoal) {
         handleChatSubmit(null, "Generate my roadmap");
     }
@@ -622,7 +547,7 @@ const DashboardMain = () => {
               </div>
             </div>
 
-            {/* QUICK ACTIONS & RECENT ACTIVITY (Kept same) */}
+            {/* QUICK ACTIONS & RECENT ACTIVITY */}
             <section>
               <h3 className="text-xl font-bold text-white mb-5 flex items-center gap-2 tracking-tight">
                 <span className="material-symbols-outlined text-amber-400">bolt</span> Quick Actions
@@ -693,7 +618,6 @@ const DashboardMain = () => {
               <h4 className="text-[#06457F] font-bold text-xl mb-3 tracking-tight">AI Insight</h4>
               <p className="text-[#06457F] text-[15px] leading-relaxed font-medium opacity-90">"{aiInsight}"</p>
             </div>
-            {/* ... rest of sidebar ... */}
             <div className="flex-1">
               <h5 className="text-[#06457F] font-bold text-xs uppercase tracking-widest mb-6 opacity-70">Upcoming Milestones</h5>
               <div className="relative pl-6 space-y-8 border-l-2 border-[#06457F]/10 ml-2">
@@ -721,31 +645,17 @@ const DashboardMain = () => {
       </div>
 
       {/* EXPANDABLE CHATBOT CART */}
-      <div 
-        className={
-            isExpanded 
-            ? "fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-all duration-300"
-            : "fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4 transition-all duration-300"
-        }
-      >
+      <div className={isExpanded ? "fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 transition-all duration-300" : "fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4 transition-all duration-300"}>
         {isChatOpen && (
-            <div className={
-                isExpanded
-                ? "w-full max-w-5xl h-[80vh] max-h-[90vh] bg-[#06457F] rounded-2xl border border-white/30 shadow-[0_0_50px_rgba(4,116,196,0.5)] flex flex-col overflow-hidden chat-animate"
-                : "w-[380px] h-[550px] max-h-[calc(100vh-8rem)] bg-[#06457F] rounded-2xl border border-white/20 ring-1 ring-cyan-500/40 shadow-2xl flex flex-col overflow-hidden chat-animate origin-bottom-right"
-            }>
-                {/* Chat Header */}
+            <div className={isExpanded ? "w-full max-w-5xl h-[80vh] max-h-[90vh] bg-[#06457F] rounded-2xl border border-white/30 shadow-[0_0_50px_rgba(4,116,196,0.5)] flex flex-col overflow-hidden chat-animate" : "w-[380px] h-[550px] max-h-[calc(100vh-8rem)] bg-[#06457F] rounded-2xl border border-white/20 ring-1 ring-cyan-500/40 shadow-2xl flex flex-col overflow-hidden chat-animate origin-bottom-right"}>
                 <div className="p-4 bg-[#0B3D91] flex items-center justify-between border-b border-white/10 shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
-                            {/* RESTORED: Smart Toy Icon */}
                             <span className="material-symbols-outlined text-white">smart_toy</span>
                         </div>
                         <div>
                             <h3 className="text-white font-bold text-sm">Career Assistant</h3>
-                            <p className="text-white/60 text-xs flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> Online
-                            </p>
+                            <p className="text-white/60 text-xs flex items-center gap-1"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> Online</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-1">
@@ -758,17 +668,10 @@ const DashboardMain = () => {
                     </div>
                 </div>
 
-                {/* Chat Messages */}
                 <div className="flex-1 bg-[#06457F] overflow-y-auto p-4 space-y-4">
                     {chatMessages.map((msg) => (
                         <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[85%] px-4 py-2.5 text-sm ${
-                                msg.sender === 'user' 
-                                ? 'message-bubble-user rounded-2xl rounded-br-none' 
-                                : 'message-bubble-ai rounded-2xl rounded-bl-none'
-                            }`}>
-                                {msg.text}
-                            </div>
+                            <div className={`max-w-[85%] px-4 py-2.5 text-sm ${msg.sender === 'user' ? 'message-bubble-user rounded-2xl rounded-br-none' : 'message-bubble-ai rounded-2xl rounded-bl-none'}`}>{msg.text}</div>
                         </div>
                     ))}
                     
@@ -787,37 +690,19 @@ const DashboardMain = () => {
                             <button onClick={(e) => handleChatSubmit(e, 'View Roadmap')} className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 text-white transition-colors">
                                 {isRoadmapReady ? 'View Roadmap' : 'Generate Roadmap'}
                             </button>
-                            <button onClick={(e) => handleChatSubmit(e, 'Resume Builder')} className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 text-white transition-colors">
-                                Resume Builder
-                            </button>
-                            <button onClick={(e) => handleChatSubmit(e, 'Mock Interview')} className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 text-white transition-colors">
-                                Mock Interview
-                            </button>
-                            <button onClick={(e) => handleChatSubmit(e, 'Find a Mentor')} className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 text-white transition-colors">
-                                Find a Mentor
-                            </button>
-                            <button onClick={(e) => handleChatSubmit(e, 'LMS Courses')} className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 text-white transition-colors">
-                                LMS Courses
-                            </button>
-                            <button onClick={(e) => handleChatSubmit(e, 'Practice Ground')} className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 text-white transition-colors">
-                                Practice Ground
-                            </button>
+                            <button onClick={(e) => handleChatSubmit(e, 'Resume Builder')} className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 text-white transition-colors">Resume Builder</button>
+                            <button onClick={(e) => handleChatSubmit(e, 'Mock Interview')} className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 text-white transition-colors">Mock Interview</button>
+                            <button onClick={(e) => handleChatSubmit(e, 'Find a Mentor')} className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 text-white transition-colors">Find a Mentor</button>
+                            <button onClick={(e) => handleChatSubmit(e, 'LMS Courses')} className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 text-white transition-colors">LMS Courses</button>
+                            <button onClick={(e) => handleChatSubmit(e, 'Practice Ground')} className="text-xs bg-white/10 hover:bg-white/20 border border-white/20 rounded-full px-3 py-1.5 text-white transition-colors">Practice Ground</button>
                         </div>
                     )}
                     
                     <div ref={chatEndRef} />
                 </div>
 
-                {/* Chat Input */}
                 <form onSubmit={handleChatSubmit} className="p-3 bg-[#0A4F8F] border-t border-white/10 flex gap-2 shrink-0">
-                    <input 
-                        type="text" 
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        placeholder="Ask me anything..." 
-                        disabled={isTyping}
-                        className="flex-1 bg-[#06457F] border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/40 focus:outline-none focus:border-[#0474C4]"
-                    />
+                    <input type="text" value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder="Ask me anything..." disabled={isTyping} className="flex-1 bg-[#06457F] border border-white/20 rounded-lg px-3 py-2 text-sm text-white placeholder-white/40 focus:outline-none focus:border-[#0474C4]"/>
                     <button type="submit" disabled={isTyping} className="p-2 bg-[#0474C4] hover:bg-[#0360a3] text-white rounded-lg flex items-center justify-center transition-colors disabled:opacity-50">
                         <span className="material-symbols-outlined text-[20px]">send</span>
                     </button>
@@ -825,21 +710,12 @@ const DashboardMain = () => {
             </div>
         )}
 
-        {/* FAB */}
         {!isExpanded && (
-            <button 
-                onClick={() => setIsChatOpen(!isChatOpen)}
-                className="h-16 w-16 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-xl shadow-cyan-500/30 flex items-center justify-center transition-all hover:scale-105 active:scale-95 group relative z-50 ring-4 ring-cyan-500/20 border border-white/20"
-            >
-                {isChatOpen ? (
-                    <span className="material-symbols-outlined text-[32px]">keyboard_arrow_down</span>
-                ) : (
-                    <span className="material-symbols-outlined text-[32px]">smart_toy</span>
-                )}
+            <button onClick={() => setIsChatOpen(!isChatOpen)} className="h-16 w-16 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-xl shadow-cyan-500/30 flex items-center justify-center transition-all hover:scale-105 active:scale-95 group relative z-50 ring-4 ring-cyan-500/20 border border-white/20">
+                {isChatOpen ? <span className="material-symbols-outlined text-[32px]">keyboard_arrow_down</span> : <span className="material-symbols-outlined text-[32px]">smart_toy</span>}
             </button>
         )}
       </div>
-
     </div>
   );
 };
