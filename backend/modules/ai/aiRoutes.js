@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 
-// ✅ Ensure this filename matches exactly: 'aiController.js'
-const { generateRoadmap } = require('./aiController');
+const { generateRoadmap, chatWithAI } = require('./aiController');
 
 router.post('/roadmap', generateRoadmap); 
+router.post('/chat', chatWithAI);
 
 module.exports = router;

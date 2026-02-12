@@ -1,36 +1,32 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const OpenAI = require('openai');
 require('dotenv').config();
 
-// ✅ FIX 1: Initialize API Client (This was missing before)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// 1. Point the OpenAI client to the FREE Groq servers!
+const groq = new OpenAI({
+    apiKey: process.env.GROQ_API_KEY,
+    baseURL: "https://api.groq.com/openai/v1" 
+});
 
+// --- ROADMAP GENERATOR ---
 const generateRoadmap = async (req, res) => {
   try {
     const { goal, currentRole, skills } = req.body; 
 
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ message: "Server Error: API Key missing" });
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(500).json({ message: "Server Error: Groq API Key missing" });
     }
 
-    const skillsList = skills && Array.isArray(skills) 
-      ? skills.map(s => s.name).join(', ') 
-      : 'None';
-
-    // ✅ FIX 2: Use the working Flash model
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const skillsList = skills && Array.isArray(skills) ? skills.map(s => s.name).join(', ') : 'None';
 
     const prompt = `
       Act as a career counselor. 
       User Role: ${currentRole}
       User Goal: ${goal}
       Current Skills: ${skillsList}
-      
-      Generate a 3-step learning roadmap.
-      IMPORTANT: Return ONLY valid JSON.
-      
-      The JSON structure must be:
+      Generate a 3-step learning roadmap. 
+      The output MUST be pure JSON matching this exact structure:
       {
-        "title": "Roadmap to ${goal}",
+        "title": "Roadmap to Goal",
         "description": "Brief summary",
         "steps": [
           { "phase": "Phase 1: Foundation", "actions": ["Task 1", "Task 2"], "duration": "1 Month" },
@@ -40,25 +36,55 @@ const generateRoadmap = async (req, res) => {
       }
     `;
 
-    console.log("🤖 Sending request to Gemini...");
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    let text = response.text();
+    console.log("🤖 Asking Groq for Roadmap...");
+    
+    const response = await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile", // Powerful, free open-source model
+        response_format: { type: "json_object" }, 
+        messages: [
+            { role: "system", content: "You are an expert career counselor. Always return valid JSON." }, 
+            { role: "user", content: prompt }
+        ],
+    });
 
-    // Clean up response
-    text = text.replace(/^```json\s*/, "").replace(/```$/, "").trim();
-
-    const roadmapData = JSON.parse(text);
+    const roadmapData = JSON.parse(response.choices[0].message.content);
     res.json({ success: true, data: roadmapData });
 
   } catch (error) {
-    console.error("❌ AI Controller Error:", error);
-    res.status(500).json({ message: "Failed to generate roadmap" });
+    console.error("🔥 AI Roadmap Error:", error.message);
+    res.status(500).json({ message: "AI Generation Failed", error: error.message });
   }
 };
 
+// --- PERSONALIZED CHATBOT ---
 const chatWithAI = async (req, res) => {
-    res.json({ message: "Chat logic pending" });
+  try {
+    const { message, context } = req.body; 
+
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(500).json({ message: "Server Error: Groq API Key missing" });
+    }
+
+    let systemInstruction = "You are a helpful AI career mentor named Career Orbit Assistant.";
+    if (context === 'resume') systemInstruction = "You are an expert resume writer. Help the user rephrase bullet points.";
+    else if (context === 'interview') systemInstruction = "You are a strict hiring manager conducting a mock interview.";
+
+    console.log("🤖 Asking Groq for Chat...");
+
+    const response = await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+            { role: "system", content: systemInstruction },
+            { role: "user", content: message }
+        ],
+    });
+
+    res.json({ reply: response.choices[0].message.content });
+
+  } catch (error) {
+    console.error("🔥 AI Chat Error:", error.message);
+    res.status(500).json({ message: "Chat Failed", error: error.message });
+  }
 };
 
 module.exports = { generateRoadmap, chatWithAI };
